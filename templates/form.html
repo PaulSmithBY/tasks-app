@@ -4,22 +4,256 @@
     <meta charset="UTF-8">
     <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
     <title>Form</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.0.2/react.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/15.0.2/react-dom.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.23/browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
 </head>
 <body>
-    <form method="post" action="/items">
-        <label>
-            Name:
-            <input type="text" name="name" />
-        </label>
-        <label>
-            Email:
-            <input type="text" name="email" />
-        </label>
-        <label>
-            Phone:
-            <input type="text" name="phone" />
-        </label>
-        <button type="submit">Submit</button>
-    </form>
+    <div id="content"></div>
+    <script type="text/babel">
+        (function () {
+
+            var Item = React.createClass({
+                onDeleteClick: function () {
+                    this.props.handleItemDelete(this.props.data.id);
+                },
+                onCheckBoxClick: function (e) {
+                    this.props.data.checked = e.target.checked;
+                },
+                render: function() {
+                    return (
+                        <tr className="item">
+                            <td><input type="checkbox" onChange={this.onCheckBoxClick}></input></td>
+                            <td>{this.props.data.name}</td>
+                            <td>{this.props.data.email}</td>
+                            <td>{this.props.data.phone}</td>
+                            <td onClick={this.onDeleteClick}>Delete</td>
+                        </tr>
+                    );
+                }
+            });
+
+            var ItemsList = React.createClass({
+                handleItemDelete: function (itemId) {
+                    this.props.handleItemDelete(itemId);
+                },
+                render: function() {
+                    var commentNodes = this.props.data.map(function(item) {
+                        return (
+                            <Item data={item} key={item.id} handleItemDelete={this.handleItemDelete}></Item>
+                        );
+                    }.bind(this));
+                    return (
+                        <table className="itemsList">
+                            <thead>
+                                <tr>
+                                    <th>Checkbox</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {commentNodes}
+                            </tbody>
+                        </table>
+                    );
+                }
+            });
+
+            var ItemsForm = React.createClass({
+                getInitialState: function() {
+                    return {name: '', email: '', phone: '', validEmail: true, validPhoneNumber: true};
+                },
+                handleNameChange: function(e) {
+                    this.setState({name: e.target.value});
+                },
+                handleEmailChange: function(e) {
+                    this.setState({email: e.target.value});
+                },
+                handlePhoneChange: function (e) {
+                    this.setState({phone: e.target.value});
+                },
+                isValidatePhoneNumber: function () {
+                    var phoneRegexp = /\+375[0-9]{9}|8017[0-9]{7}/;
+                    var findString = this.state.phone.match(phoneRegexp);
+                    var result = findString && findString.length !== 0 && findString[0] === this.state.phone;
+
+                    this.setState({validPhoneNumber: result});
+                    return result;
+                },
+                isValidEmail: function () {
+                    var validateEmailRegexp = /\S+[^@]@\S+[^@]\.\S+[^@]/;
+                    var findString = this.state.email.match(validateEmailRegexp);
+                    var result = findString && findString.length !== 0 && findString[0] === this.state.email;
+
+                    this.setState({validEmail: result});
+                    return result;
+                },
+                isValidateFields: function () {
+                    var isValidatePhoneNumber = this.isValidatePhoneNumber();
+                    var isValidEmail = this.isValidEmail();
+
+                    return isValidatePhoneNumber && isValidEmail;
+                },
+                handleSubmit: function(e) {
+                    e.preventDefault();
+                    var name = this.state.name.trim();
+                    var email = this.state.email.trim();
+                    var phone = this.state.phone.trim();
+                    if (name && email && phone && this.isValidateFields()) {
+                        this.props.onItemSubmit({name: name, email: email, phone: phone});
+                        this.setState({name: '', email: '', phone: ''});
+                    }
+                },
+                render: function() {
+                    return (
+                        <form method="post" onSubmit={this.handleSubmit}>
+                            <label>
+                                Name:
+                                <input
+                                    type="text"
+                                    name="name"
+                                    placeholder="Input name"
+                                    value={this.state.name}
+                                    onChange={this.handleNameChange} />
+                            </label>
+                            <label>
+                                Email:
+                                <input
+                                    type="text"
+                                    name="email"
+                                    placeholder="Your email address"
+                                    value={this.state.email}
+                                    onChange={this.handleEmailChange} />
+                                    {this.state.validEmail ? null : <span>Invalid email</span>}
+                            </label>
+                            <label>
+                                Phone:
+                                <input
+                                    type="text"
+                                    name="phone"
+                                    placeholder="+375ZZXXXYYYY"
+                                    value={this.state.phone}
+                                    onChange={this.handlePhoneChange} />
+                                    {this.state.validPhoneNumber ? null : <span>Invalid phone number</span>}
+                            </label>
+                            <button type="submit">Submit</button>
+                        </form>
+                    );
+                }
+            });
+
+            var ItemsBox = React.createClass({
+                getInitialState: function() {
+                    return {data: []};
+                },
+                loadCommentsFromServer: function() {
+                    $.ajax({
+                        url: this.props.url,
+                        dataType: 'json',
+                        cache: false,
+                        success: function(data) {
+                            this.setState({data: data});
+                        }.bind(this),
+                        error: function(xhr, status, err) {
+                            console.error(this.props.url, status, err.toString());
+                        }.bind(this)
+                    });
+                },
+                componentDidMount: function() {
+                    this.loadCommentsFromServer();
+                },
+                addNewItemToState: function (item) {
+                    var updatedItems = this.state.data.concat([item]);
+
+                    this.setState({data: updatedItems});
+                },
+                removeItemsFromState: function (deletedItems) {
+                    var updatedItems = this.state.data.filter(function (item) {
+                        var result = !deletedItems.some(function (deletedItem) {
+                            return item.id === deletedItem.id;
+                        });
+
+                        return result;
+                    });
+
+                    this.setState({data: updatedItems});
+                },
+                clearStateData: function () {
+                    this.setState({data: []});
+                },
+                handleItemSubmit: function(item) {
+                    $.ajax({
+                        url: this.props.url,
+                        dataType: 'json',
+                        type: 'POST',
+                        data: item,
+                        success: function(item) {
+                            this.addNewItemToState(item);
+                        }.bind(this),
+                        error: function(xhr, status, err) {
+                            console.error(this.props.url, status, err.toString());
+                        }.bind(this)
+                    });
+                },
+                deleteItems: function(itemsId, callback) {
+                    var params = itemsId && itemsId.length !== 0 ? '?id=' + itemsId.join(',') : '';
+
+                    $.ajax({
+                        url: this.props.url + params,
+                        dataType: 'json',
+                        type: 'DELETE',
+                        success: function(items) {
+                            callback(items);
+                        }.bind(this),
+                        error: function(xhr, status, err) {
+                            console.error(this.props.url, status, err.toString());
+                        }.bind(this)
+                    });
+                },
+                handleItemDelete: function (itemId) {
+                    if(itemId) {
+                        this.deleteItems([itemId], this.removeItemsFromState);
+                    }
+                },
+                deleteAllItems: function () {
+                    if(this.state.data.length !== 0) {
+                        this.deleteItems([], this.clearStateData);
+                    }
+                },
+                deleteSelectedItems: function () {
+                    var items = this.state.data.filter(function (item) {
+                        return item.checked;
+                    }).map(function (item) {
+                        return item.id;
+                    });
+
+                    if (items.length !== 0) {
+                        this.deleteItems(items, this.removeItemsFromState);
+                    }
+                },
+                render: function() {
+                    return (
+                        <div className="itemsBox">
+                            <h1>Add item</h1>
+                            <ItemsForm onItemSubmit={this.handleItemSubmit}/>
+                            <h1>Items</h1>
+                            <ItemsList data={this.state.data} handleItemDelete={this.handleItemDelete}/>
+                            <button onClick={this.deleteAllItems}>Delete all items</button>
+                            <button onClick={this.deleteSelectedItems}>Delete selected items</button>
+                        </div>
+                    );
+                }
+            });
+
+            ReactDOM.render(
+                    React.createElement(ItemsBox, {url: '/items'}),
+                    document.getElementById('content')
+            );
+        })();
+    </script>
 </body>
 </html>
